@@ -225,12 +225,13 @@ IMPORTANT:
     }
 
   } catch (err) {
-    console.error("🔥 Analyze Resume Fatal Error:");
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
-
-    res.status(500).json({ error: "Resume analysis failed" });
-  }
+  console.error("🔥 FULL ERROR:", err);
+  res.status(500).json({
+    error: "Resume analysis failed",
+    message: err.message,
+    stack: err.stack
+  });
+}
 });
 
 
