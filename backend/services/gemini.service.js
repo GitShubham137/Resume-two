@@ -14,9 +14,11 @@ async function callGemini(prompt) {
 
     return response.data.candidates[0].content.parts[0].text;
   } catch (error) {
-    console.error("Gemini API Error:", error.response?.data || error.message);
-    throw error;
-  }
+  console.error("🔥 Gemini API Error:");
+  console.error("Status:", error.response?.status);
+  console.error("Data:", error.response?.data);
+  throw error;
+}
 }
 
 export default callGemini;
