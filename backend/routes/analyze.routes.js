@@ -80,10 +80,93 @@ const extractTextFromBuffer = async (buffer) => {
 
 
 // Analyze resume
+// router.post("/analyze-resume", upload.single("resume"), async (req, res) => {
+//   try {
+//     // console.log(11,"✅✅");
+//     const resumeText = await extractTextFromBuffer(req.file.buffer);
+
+//     const prompt = `
+// You are an experienced technical recruiter and interviewer.
+
+// Resume Text:
+// """
+// ${resumeText}
+// """
+
+// TASK:
+// 1. Give clear, constructive feedback on this resume (strengths + improvements).
+// 2. Generate 4 to 5 technical or role-based interview questions suited to the candidate's experience.
+
+// IMPORTANT:
+// - Respond ONLY in valid JSON
+// - Do NOT include markdown or backticks
+// - Follow this exact format:
+
+// {
+//   "feedback": "string",
+//   "questions": ["q1", "q2", "q3", "q4", "q5"]
+// }
+// `;
+
+//     const geminiText = await callGemini(prompt);
+
+//     try {
+//       const cleanJson = geminiText.replace(/```json|```/g, "").trim();
+//       const parsed = JSON.parse(cleanJson);
+
+//       return res.json(parsed);
+//     } catch (parseErr) {
+//       console.error("JSON parse error:", parseErr.message);
+
+//       return res.status(500).json({
+//         error: "Invalid response from Gemini",
+//         raw: geminiText
+//       });
+//     }
+//   } catch (err) {
+//     console.error("Analyze Resume Error:", err.message);
+//     res.status(500).json({ error: "Resume analysis failed" });
+//   }
+// });
+
 router.post("/analyze-resume", upload.single("resume"), async (req, res) => {
+  console.log("📥 /analyze-resume hit");
+
   try {
-    console.log(11,"✅✅");
+    console.log("👉 Headers received:", req.headers["content-type"]);
+
+    // 1️⃣ Check file
+    if (!req.file) {
+      console.error("❌ No file received in request");
+      return res.status(400).json({ error: "Resume PDF required" });
+    }
+
+    console.log("✅ File received:");
+    console.log("   - Original name:", req.file.originalname);
+    console.log("   - Size (bytes):", req.file.size);
+
+    // 2️⃣ Check environment variable
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("❌ GEMINI_API_KEY is missing");
+      return res.status(500).json({ error: "Server misconfiguration: Missing API key" });
+    }
+
+    console.log("🔑 GEMINI_API_KEY exists");
+
+    // 3️⃣ Extract text
+    console.log("📄 Extracting text from PDF...");
     const resumeText = await extractTextFromBuffer(req.file.buffer);
+
+    if (!resumeText || resumeText.trim().length === 0) {
+      console.error("❌ Extracted text is empty");
+      return res.status(400).json({ error: "Failed to extract text from PDF" });
+    }
+
+    console.log("✅ Text extracted successfully");
+    console.log("   - Extracted length:", resumeText.length);
+
+    // 4️⃣ Build prompt
+    console.log("🧠 Building Gemini prompt...");
 
     const prompt = `
 You are an experienced technical recruiter and interviewer.
@@ -108,26 +191,48 @@ IMPORTANT:
 }
 `;
 
+    // 5️⃣ Call Gemini
+    console.log("🚀 Calling Gemini...");
     const geminiText = await callGemini(prompt);
 
+    if (!geminiText) {
+      console.error("❌ Gemini returned empty response");
+      return res.status(500).json({ error: "Empty response from Gemini" });
+    }
+
+    console.log("✅ Gemini response received");
+    console.log("📝 Raw Gemini output (first 500 chars):");
+    console.log(geminiText.substring(0, 500));
+
+    // 6️⃣ Parse JSON
     try {
       const cleanJson = geminiText.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleanJson);
 
+      console.log("✅ JSON parsed successfully");
+
       return res.json(parsed);
+
     } catch (parseErr) {
-      console.error("JSON parse error:", parseErr.message);
+      console.error("❌ JSON parse error:", parseErr.message);
+      console.error("📝 Raw Gemini output:");
+      console.error(geminiText);
 
       return res.status(500).json({
         error: "Invalid response from Gemini",
         raw: geminiText
       });
     }
+
   } catch (err) {
-    console.error("Analyze Resume Error:", err.message);
+    console.error("🔥 Analyze Resume Fatal Error:");
+    console.error("Message:", err.message);
+    console.error("Stack:", err.stack);
+
     res.status(500).json({ error: "Resume analysis failed" });
   }
 });
+
 
 // Optimized for small models (Feedback Only)
 router.post("/analyze", upload.single("resume"), async (req, res) => {
